@@ -80,6 +80,8 @@ class LOGIC_OT_add_component(Operator):
         with guard_modules():
             # Create BGE module
             bge = sys.modules['bge'] = types.ModuleType("bge")
+            bge.__component__ = True
+
             bge.types = sys.modules['bge.types'] = types.ModuleType("bge.types")
             bge.types.KX_PythonComponent = KX_PythonComponent
 
