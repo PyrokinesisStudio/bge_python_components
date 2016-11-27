@@ -22,6 +22,7 @@ import types
 from contextlib import contextmanager
 from os import path
 from weakref import ref
+from logging import getLogger
 
 from .component_base import KX_PythonComponent
 from .common import (load_component_class, path_to_list, list_to_path, ARG_PROPERTY_NAME, COMPONENTS_NAME,
@@ -33,6 +34,7 @@ REQUIRED_FILE_NAMES = "component_base.py", "common.py", "component_system.py", "
 
 
 ADDON_DIR = path.dirname(__file__)
+logger = getLogger(__name__)
 
 
 @contextmanager
@@ -81,7 +83,9 @@ class LOGIC_OT_add_component(Operator):
             try:
                 component_cls = load_component_class(import_path)
 
-            except (ImportError, AttributeError):
+            except Exception as err:
+                self.report({'ERROR'}, "Unable to import module {!r}: {}".format(import_path, err))
+                logger.exception("Unable to import module {!r}".format(import_path))
                 return {'CANCELLED'}
 
         # Load args
@@ -102,6 +106,8 @@ class LOGIC_OT_add_component(Operator):
 
         component_paths = path_to_list(component_paths_prop.value)
         if import_path in component_paths:
+            self.report({'INFO'}, "{!r} component already loaded".format(import_path))
+            logger.info("{!r} component already loaded".format(import_path))
             return {'CANCELLED'}
 
         component_paths.append(import_path)
@@ -115,6 +121,7 @@ class LOGIC_OT_add_component(Operator):
             prop = properties[prop_name]
             prop.value = default_value
 
+        logger.info("{!r} component loaded".format(import_path))
         return {'FINISHED'}
 
 
@@ -135,6 +142,8 @@ class LOGIC_OT_remove_component(Operator):
         import_path = self.import_path
 
         if not import_path:
+            self.report({'ERROR'}, "Import path is required to remove component")
+            logger.error("Import path is required to remove component")
             return {'CANCELLED'}
 
         if COMPONENT_PATHS_NAME in properties:
@@ -151,6 +160,7 @@ class LOGIC_OT_remove_component(Operator):
 
             bpy.ops.object.game_property_remove(index=index)
 
+        logger.info("{!r} component removed".format(import_path))
         return {'FINISHED'}
 
 
@@ -166,11 +176,11 @@ class LOGIC_OT_reload_component(Operator):
         return context.active_object is not None
 
     def execute(self, context):
-        obj = context.active_object
-        properties = obj.game.properties
         import_path = self.import_path
 
         if not import_path:
+            self.report({'ERROR'}, "Import path is required to reload component")
+            logger.info("Import path is required to reload component")
             return {'CANCELLED'}
 
         # Remove component
@@ -178,6 +188,9 @@ class LOGIC_OT_reload_component(Operator):
 
         # Add component
         bpy.ops.logic.component_add(import_path=import_path)
+
+        self.report({'INFO'}, "{!r} component reloaded".format(import_path))
+        logger.info("{!r} component reloaded".format(import_path))
 
         return {'FINISHED'}
 
@@ -198,13 +211,11 @@ class LOGIC_PT_components(Panel):
         ob = context.active_object
         game = ob.game
 
-        st = context.space_data
-
         row = layout.row()
         row.prop(ob, "component_import_path", text="")
         row.operator("logic.component_add", text="Add Component")
 
-        if not COMPONENT_PATHS_NAME in game.properties:
+        if COMPONENT_PATHS_NAME not in game.properties:
             return
 
         component_paths_prop = game.properties[COMPONENT_PATHS_NAME]
@@ -267,14 +278,14 @@ class PersistantHandler:
         handlers.remove(handler)
 
 
-class TextblockMonitor(PersistantHandler):
+class TextBlockMonitor(PersistantHandler):
 
     def __init__(self, required_file_names):
         self._required_file_names = required_file_names
 
     def update(self, scene):
         for file_name in self._required_file_names:
-            if not file_name in bpy.data.texts:
+            if file_name not in bpy.data.texts:
                 text_block = bpy.data.texts.new(file_name)
 
                 with open(path.join(ADDON_DIR, file_name), 'r') as f:
@@ -294,13 +305,13 @@ def register():
     register_module(__name__)
 
     Object.component_import_path = StringProperty()
-    TextblockMonitor.install(REQUIRED_FILE_NAMES)
+    TextBlockMonitor.install(REQUIRED_FILE_NAMES)
     ScenePropMonitor.install(MAINLOOP_FILE_NAME)
 
 
 def unregister():
     ScenePropMonitor.uninstall()
-    TextblockMonitor.uninstall()
+    TextBlockMonitor.uninstall()
     del Object.component_import_path
 
     unregister_module(__name__)
