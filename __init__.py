@@ -25,8 +25,7 @@ from weakref import ref
 from logging import getLogger
 
 from .component_base import KX_PythonComponent
-from .common import (load_component_class, path_to_list, list_to_path, ARG_PROPERTY_NAME, COMPONENTS_NAME,
-                    COMPONENT_PATHS_NAME)
+from .common import load_component_class, parse_component_args, COMPONENT_ARG_FORMAT
 
 
 MAINLOOP_FILE_NAME = "mainloop.py"
@@ -52,6 +51,10 @@ def prop_type_from_value(value):
 
 def get_prefixed_properties(properties, prefix):
     return [p for p in properties if p.name.startswith(prefix)]
+
+
+def component_is_already_loaded(properties, import_path):
+    pass
 
 
 class LOGIC_OT_add_component(Operator):
@@ -96,25 +99,15 @@ class LOGIC_OT_add_component(Operator):
             args = {}
 
         properties = obj.game.properties
+        component_data = set(parse_component_args(properties)) # Values here are game property objectss
 
-        try:
-            component_paths_prop = properties[COMPONENT_PATHS_NAME]
-
-        except KeyError:
-            bpy.ops.object.game_property_new(type='STRING', name=COMPONENT_PATHS_NAME)
-            component_paths_prop = properties[COMPONENT_PATHS_NAME]
-
-        component_paths = path_to_list(component_paths_prop.value)
-        if import_path in component_paths:
+        if import_path in component_data: # TODO
             self.report({'INFO'}, "{!r} component already loaded".format(import_path))
             logger.info("{!r} component already loaded".format(import_path))
             return {'CANCELLED'}
 
-        component_paths.append(import_path)
-        component_paths_prop.value = list_to_path(component_paths)
-
         for name, default_value in args.items():
-            prop_name = ARG_PROPERTY_NAME.format(import_path=import_path, class_name=name)
+            prop_name = COMPONENT_ARG_FORMAT.format(import_path=import_path, class_name=name)
             prop_type = prop_type_from_value(default_value)
             bpy.ops.object.game_property_new(type=prop_type, name=prop_name)
 
@@ -146,19 +139,14 @@ class LOGIC_OT_remove_component(Operator):
             logger.error("Import path is required to remove component")
             return {'CANCELLED'}
 
-        if COMPONENT_PATHS_NAME in properties:
-            component_paths_prop = properties[COMPONENT_PATHS_NAME]
-            component_paths = path_to_list(component_paths_prop.value)
-            component_paths.remove(import_path)
-            component_paths_prop.value = list_to_path(component_paths)
+        component_data = parse_component_args(properties) # Values here are game property objects
+        for import_path, component_args in component_data.items():
+            for game_property in component_args.values():
+                index = properties.find(game_property.name)
+                if index == -1:
+                    continue
 
-        arg_properties = get_prefixed_properties(properties, import_path)
-        for prop in arg_properties:
-            index = properties.find(prop.name)
-            if index == -1:
-                continue
-
-            bpy.ops.object.game_property_remove(index=index)
+                bpy.ops.object.game_property_remove(index=index)
 
         logger.info("{!r} component removed".format(import_path))
         return {'FINISHED'}
@@ -215,13 +203,9 @@ class LOGIC_PT_components(Panel):
         row.prop(ob, "component_import_path", text="")
         row.operator("logic.component_add", text="Add Component")
 
-        if COMPONENT_PATHS_NAME not in game.properties:
-            return
+        components_data = parse_component_args(game.properties)
 
-        component_paths_prop = game.properties[COMPONENT_PATHS_NAME]
-        component_paths = path_to_list(component_paths_prop.value)
-
-        for import_path in component_paths:
+        for import_path, component_args in components_data.items():
             box = layout.box()
 
             row = box.row()
@@ -230,15 +214,9 @@ class LOGIC_PT_components(Panel):
             row.operator("logic.component_reload", text="", icon='RECOVER_LAST', emboss=False).import_path = import_path
             row.operator("logic.component_remove", text="", icon='X', emboss=False).import_path = import_path
 
-            prop_prefix = "{}.".format(import_path)
-
-            for prop in game.properties:
-                if not prop.name.startswith(prop_prefix):
-                    continue
-
+            for name, prop in component_args.items():
                 row = box.row()
-                arg_name = prop.name[len(prop_prefix):]
-                row.label(arg_name)
+                row.label(name)
                 row.prop(prop, "value", text="")
 
 

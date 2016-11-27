@@ -1,10 +1,13 @@
 from bge import logic, types
-from common import load_component_class, ARG_PROPERTY_NAME, COMPONENTS_NAME, COMPONENT_PATHS_NAME, path_to_list
+from common import load_component_class, parse_component_args
 
 
 # Create fake base class
 from component_base import KX_PythonComponent
 types.KX_PythonComponent = KX_PythonComponent
+
+
+COMPONENTS_NAME = "components"
 
 
 def any_positive(sensors):
@@ -15,28 +18,28 @@ def any_positive(sensors):
     return False
 
 
-def create_args_dict(component_cls, obj, import_path):
+def create_args_dict(component_cls, component_args):
     try:
-        arg_defaults = component_cls.args
+        base_args = component_cls.args.copy()
 
     except AttributeError:
         return {}
 
-    args = {}
-    for name, default_value in arg_defaults.items():
-        prop_name = ARG_PROPERTY_NAME.format(import_path=import_path, class_name=name)
-        args[name] = obj.get(prop_name, default_value)
-
-    return args
+    base_args.update(component_args)
+    return base_args
 
 
-def init_components(obj, component_paths):
+def init_components(obj):
     components = []
 
-    for import_path in component_paths:
+    # Load properties from object
+    prop_dict = {k: obj[k] for k in obj.getPropertyNames()}
+
+    component_data = parse_component_args(prop_dict)
+    for import_path, component_args in component_data.items():
         cls = load_component_class(import_path)
 
-        args = create_args_dict(cls, obj, import_path)
+        args = create_args_dict(cls, component_args)
 
         component = cls(obj)
         component.start(args)
@@ -63,14 +66,8 @@ def update_from_controller(cont):
 
 def update_scene(scene):
     for obj in scene.objects:
-        if COMPONENT_PATHS_NAME not in obj:
-            continue
-
-        component_paths_string = obj[COMPONENT_PATHS_NAME]
-        component_paths = path_to_list(component_paths_string)
-
         if COMPONENTS_NAME not in obj:
-            obj[COMPONENTS_NAME] = init_components(obj, component_paths)
+            obj[COMPONENTS_NAME] = init_components(obj)
 
         components = obj[COMPONENTS_NAME]
         update_components(components)
