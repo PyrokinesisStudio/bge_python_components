@@ -21,7 +21,7 @@ from abc import ABC, abstractmethod
 from mathutils import Vector
 from contextlib import contextmanager
 from os import path
-from logging import getLogger, basicConfig
+from logging import getLogger, basicConfig, INFO
 
 from .common import load_component_class, group_component_args, COMPONENT_ARG_FORMAT
 from .component_base import KX_PythonComponent
@@ -32,8 +32,8 @@ MAINLOOP_FILE_NAME = "mainloop.py"
 REQUIRED_FILE_NAMES = "component_base.py", "common.py", "component_system.py", "components.py", MAINLOOP_FILE_NAME
 
 ADDON_DIR = path.dirname(__file__)
+basicConfig(level=INFO)
 logger = getLogger(__name__)
-basicConfig()
 
 
 @contextmanager
@@ -227,7 +227,6 @@ class LOGIC_OT_reload_component(Operator):
 
         self.report({'INFO'}, "{!r} component reloaded".format(import_path))
         logger.info("{!r} component reloaded".format(import_path))
-
         return {'FINISHED'}
 
 
