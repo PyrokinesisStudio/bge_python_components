@@ -1,4 +1,42 @@
 from collections import namedtuple
+from json import JSONEncoder, JSONDecoder, dumps, loads
+from mathutils import Vector
+
+component_names = 'xyzw'
+component_to_index = {c: i for i, c in enumerate(component_names)}
+
+
+class VectorEncoder(JSONEncoder):
+
+    def default(self, obj):
+        if isinstance(obj, Vector):
+            return {'vector': {k: v for k, v in zip(component_names, obj)}}
+
+        return super().default(obj)
+
+
+class VectorDecoder(JSONDecoder):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(object_hook=self.object_hook, *args, **kwargs)
+
+    def object_hook(self, obj):
+        if 'vector' in obj:
+            vect = obj['vector']
+            values = list(vect.items())
+            values.sort(key=lambda a: component_to_index[a[0]])
+            names, components = zip(*values)
+            return Vector(components)
+
+        return obj
+
+
+def to_json_string(value):
+    return dumps(value, cls=VectorEncoder)
+
+
+def from_json_string(json):
+    return loads(json, cls=VectorDecoder)
 
 
 ComponentProperty = namedtuple("ComponentProperty", "import_path arg_name")
@@ -32,7 +70,7 @@ def parse_component_arg_name(name):
     return ComponentProperty(name[start_import_path:end_import_path], name[start_arg_name:])
 
 
-def parse_component_args(properties):
+def group_component_args(properties):
     components = {}
 
     for name, value in properties.items():

@@ -1,5 +1,5 @@
 from bge import logic, types
-from common import load_component_class, parse_component_args
+from common import load_component_class, group_component_args, from_json_string
 
 
 # Create fake base class
@@ -33,9 +33,10 @@ def init_components(obj):
     components = []
 
     # Load properties from object
-    prop_dict = {k: obj[k] for k in obj.getPropertyNames()}
+    json_prop_dict = {k: obj[k] for k in obj.getPropertyNames()}
+    prop_dict = {k: from_json_string(v) for k, v in json_prop_dict.items()}
 
-    component_data = parse_component_args(prop_dict)
+    component_data = group_component_args(prop_dict)
     for import_path, component_args in component_data.items():
         cls = load_component_class(import_path)
 
