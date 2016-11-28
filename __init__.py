@@ -176,17 +176,25 @@ class LOGIC_OT_remove_component(Operator):
             return {'CANCELLED'}
 
         component_data = group_component_args(properties) # Values here are game property objects
-        for import_path, component_args in component_data.items():
-            for game_property in component_args.values():
-                game_property_name = game_property.name
 
-                index = properties.find(game_property_name)
-                if index != -1:
-                    bpy.ops.object.game_property_remove(index=index)
+        try:
+            component_args = component_data[import_path]
 
-                c_index = obj.component_properties.find(game_property_name)
-                if c_index != -1:
-                    obj.component_properties.remove(c_index)
+        except KeyError:
+            self.report({'ERROR'}, "Import path is not present in current components")
+            logger.error("Import path {!r} is not present in current components".format(import_path))
+            return {'CANCELLED'}
+
+        for game_property in component_args.values():
+            game_property_name = game_property.name
+
+            index = properties.find(game_property_name)
+            if index != -1:
+                bpy.ops.object.game_property_remove(index=index)
+
+            c_index = obj.component_properties.find(game_property_name)
+            if c_index != -1:
+                obj.component_properties.remove(c_index)
 
         logger.info("{!r} component removed".format(import_path))
         return {'FINISHED'}
@@ -260,7 +268,7 @@ class LOGIC_PT_draw_components(Panel):
                 row.label(display_prop_name)
 
                 group = ob.component_properties[prop.name]
-                group.prop(row)
+                group.prop(row.column())
 
 
 class PersistantHandler(ABC):

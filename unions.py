@@ -160,9 +160,9 @@ def get_enum_items(self, ctx):
 
 
 factories = OrderedDict((
-    ('vector2', (FloatVectorProperty, {'size': 2})),
-    ('vector3', (FloatVectorProperty, {'size': 3})),
-    ('vector4', (FloatVectorProperty, {'size': 4})),
+    ('vector2', (FloatVectorProperty, {'size': 2, 'subtype': 'XYZ'})),
+    ('vector3', (FloatVectorProperty, {'size': 3, 'subtype': 'XYZ'})),
+    ('vector4', (FloatVectorProperty, {'size': 4, 'subtype': 'XYZ'})),
     ('integer', (IntProperty, {})),
     ('boolean', (BoolProperty, {})),
     ('float', (FloatProperty, {})),
