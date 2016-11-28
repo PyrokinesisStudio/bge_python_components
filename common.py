@@ -46,10 +46,10 @@ def load_component_class(import_path):
     try:
         module_path, class_name = import_path.rsplit('.', 1)
     except ValueError:
-        raise ValueError("Invalid import path {!r}: too few '.' separated names (expected two or more)".format(import_path))
+        raise ValueError("Invalid import path {!r}: too few '.' separated names (expected two or more)"
+                         .format(import_path))
 
     module = __import__(module_path, fromlist=[class_name])
-    print(dir(module), module)
     cls = getattr(module, class_name)
     return cls
 

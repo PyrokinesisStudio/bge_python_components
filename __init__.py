@@ -21,7 +21,7 @@ from abc import ABC, abstractmethod
 from mathutils import Vector
 from contextlib import contextmanager
 from os import path
-from logging import getLogger
+from logging import getLogger, basicConfig
 
 from .common import load_component_class, group_component_args, COMPONENT_ARG_FORMAT
 from .component_base import KX_PythonComponent
@@ -33,6 +33,7 @@ REQUIRED_FILE_NAMES = "component_base.py", "common.py", "component_system.py", "
 
 ADDON_DIR = path.dirname(__file__)
 logger = getLogger(__name__)
+basicConfig()
 
 
 @contextmanager
