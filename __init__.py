@@ -11,7 +11,7 @@ bl_info = {
 
 from bpy.types import Panel, Object, Operator, PropertyGroup
 from bpy.props import StringProperty, CollectionProperty, EnumProperty
-from bpy.utils import register_module, unregister_module, register_class
+from bpy.utils import register_module, unregister_module, register_class, unregister_class
 
 import bpy
 import sys
@@ -272,38 +272,17 @@ class LOGIC_PT_draw_components(Panel):
 
 class PersistantHandler(ABC):
 
-    @classmethod
-    def tag_class(cls, func):
-        func._class = cls
-        return func
-
-    @classmethod
-    def find_from_tag(cls, funcs):
-        for func in funcs:
-            if not hasattr(func, "_class"):
-                continue
-
-            if func._class is cls:
-                return func
-
-        raise ValueError
-
-    @classmethod
-    def install(cls, *args, **kwargs):
-        instance = cls(*args, **kwargs)
-
+    def install(self):
         @bpy.app.handlers.persistent
-        @cls.tag_class
         def update(scene):
-            instance.update(scene)
+            self.update(scene)
 
         bpy.app.handlers.scene_update_post.append(update)
+        self._handler = update
 
-    @classmethod
-    def uninstall(cls):
-        handlers = bpy.app.handlers.scene_update_post
-        handler = cls.find_from_tag(handlers)
-        handlers.remove(handler)
+    def uninstall(self):
+        bpy.app.handlers.scene_update_post.remove(self._handler)
+        self._handler = None
 
     @abstractmethod
     def update(self, scene):
@@ -316,13 +295,34 @@ class TextBlockMonitor(PersistantHandler):
     def __init__(self, required_file_names):
         self._required_file_names = required_file_names
 
+    def uninstall(self):
+        for file_name in self._required_file_names:
+            try:
+                text_block = bpy.data.texts[file_name]
+            except KeyError:
+                continue
+
+            as_string = text_block.as_string()
+
+            with open(path.join(ADDON_DIR, file_name), 'r') as f:
+                file_string = f.read()
+
+            if file_string == as_string:
+                bpy.data.texts.remove(text_block, do_unlink=True)
+                logger.info("Deleting text block {!r}".format(file_name))
+
+        super().uninstall()
+
     def update(self, scene):
         for file_name in self._required_file_names:
             if file_name not in bpy.data.texts:
                 text_block = bpy.data.texts.new(file_name)
 
-                with open(path.join(ADDON_DIR, file_name), 'r') as f:
+                file_path = path.join(ADDON_DIR, file_name)
+                with open(file_path, 'r') as f:
                     text_block.from_string(f.read())
+
+                logger.info("Creating text block from disk: {!r}".format(file_path))
 
 
 class ScenePropMonitor(PersistantHandler):
@@ -331,12 +331,24 @@ class ScenePropMonitor(PersistantHandler):
     def __init__(self, mainloop_file_name):
         self._mainloop_file_name = mainloop_file_name
 
+    def uninstall(self):
+        for scene in bpy.data.scenes:
+            if scene.get('__main__') == self._mainloop_file_name:
+                logger.info("Clearing __main__ for Scene {!r}".format(scene.name))
+                del scene['__main__']
+
+        super().uninstall()
+
     def update(self, scene):
-        scene['__main__'] = self._mainloop_file_name
+        if scene.get('__main__') != self._mainloop_file_name:
+            logger.info("Setting __main__ for Scene {!r}".format(scene.name))
+            scene['__main__'] = self._mainloop_file_name
 
 
 # Build GameObjectProperty property group
 GameObjectProperty = make_generic_property(GameObjectMixin)
+
+handlers = []
 
 
 def register():
@@ -346,17 +358,23 @@ def register():
     Object.component_import_path = StringProperty()
     Object.component_properties = bpy.props.CollectionProperty(type=GameObjectProperty)
 
-    TextBlockMonitor.install(REQUIRED_FILE_NAMES)
-    ScenePropMonitor.install(MAINLOOP_FILE_NAME)
+    handlers.append(TextBlockMonitor(REQUIRED_FILE_NAMES))
+    handlers.append(ScenePropMonitor(MAINLOOP_FILE_NAME))
+
+    for handler in handlers:
+        handler.install()
 
 
 def unregister():
-    ScenePropMonitor.uninstall()
-    TextBlockMonitor.uninstall()
+    for handler in handlers:
+        handler.uninstall()
+    handlers.clear()
+
     del Object.component_import_path
     del Object.component_properties
 
     unregister_module(__name__)
+    unregister_class(GameObjectProperty)
 
 
 if __name__ == "__main__":

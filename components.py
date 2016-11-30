@@ -1,5 +1,4 @@
 import bge
-from mathutils import Vector
 
 
 class ThirdPerson(bge.types.KX_PythonComponent):
@@ -15,14 +14,11 @@ class ThirdPerson(bge.types.KX_PythonComponent):
     args = {
         "Move Speed": 10,
         "Turn Speed": 0.04,
-        "Dir": {"UP", "DOWN"},
-        'Some Vec': Vector((0, 0, 0))
     }
 
     def start(self, args):
         self.move_speed = args['Move Speed']
         self.turn_speed = args['Turn Speed']
-
 
     def update(self):
         keyboard = bge.logic.keyboard.events
