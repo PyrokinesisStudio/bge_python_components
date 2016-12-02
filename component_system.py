@@ -18,13 +18,14 @@ def any_positive(sensors):
     return False
 
 
-def create_args_dict(component_cls, component_args):
+def create_args_dict(component_cls, raw_component_args):
     try:
         base_args = component_cls.args.copy()
 
     except AttributeError:
-        return {}
+        base_args = {}
 
+    component_args = {k: from_json_string(v) for k, v in raw_component_args.items()}
     base_args.update(component_args)
     return base_args
 
@@ -33,14 +34,13 @@ def init_components(obj):
     components = []
 
     # Load properties from object
-    json_prop_dict = {k: obj[k] for k in obj.getPropertyNames()}
-    prop_dict = {k: from_json_string(v) for k, v in json_prop_dict.items()}
+    prop_dict = {k: obj[k] for k in obj.getPropertyNames()}
 
     component_data = group_component_args(prop_dict)
-    for import_path, component_args in component_data.items():
+    for import_path, raw_component_args in component_data.items():
         cls = load_component_class(import_path)
 
-        args = create_args_dict(cls, component_args)
+        args = create_args_dict(cls, raw_component_args)
 
         component = cls(obj)
         component.start(args)
