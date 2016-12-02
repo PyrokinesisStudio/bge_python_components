@@ -20,8 +20,9 @@ import types
 from abc import ABC, abstractmethod
 from mathutils import Vector
 from contextlib import contextmanager
-from os import path
+from os import path as os_path
 from logging import getLogger, basicConfig, INFO
+from sys import path as sys_path
 
 from .common import load_component_class, group_component_args, COMPONENT_ARG_FORMAT
 from .component_base import KX_PythonComponent
@@ -31,7 +32,7 @@ from .unions import GameObjectMixin, make_generic_property
 MAINLOOP_FILE_NAME = "mainloop.py"
 REQUIRED_FILE_NAMES = "component_base.py", "common.py", "component_system.py", "components.py", MAINLOOP_FILE_NAME
 
-ADDON_DIR = path.dirname(__file__)
+ADDON_DIR = os_path.dirname(__file__)
 basicConfig(level=INFO)
 logger = getLogger(__name__)
 
@@ -42,6 +43,14 @@ def guard_modules():
     yield
     for mod_name in set(sys.modules) - modules:
         del sys.modules[mod_name]
+
+
+@contextmanager
+def temporary_add_path(path):
+    sys_path.insert(0, path)
+    yield
+    assert sys_path[0] == path
+    del sys_path[0]
 
 
 def install_fake_bge_module():
@@ -123,13 +132,15 @@ class LOGIC_OT_add_component(Operator):
         with guard_modules():
             install_fake_bge_module()
 
-            try:
-                component_cls = load_component_class(import_path)
+            current_file_path = bpy.path.abspath("//")
+            with temporary_add_path(current_file_path):
+                try:
+                    component_cls = load_component_class(import_path)
 
-            except Exception as err:
-                self.report({'ERROR'}, "Unable to import module {!r}: {}".format(import_path, err))
-                logger.exception("Unable to import module {!r}".format(import_path))
-                return {'CANCELLED'}
+                except Exception as err:
+                    self.report({'ERROR'}, "Unable to import module {!r}: {}".format(import_path, err))
+                    logger.exception("Unable to import module {!r}".format(import_path))
+                    return {'CANCELLED'}
 
         # Load args
         try:
@@ -304,7 +315,8 @@ class TextBlockMonitor(PersistantHandler):
 
             as_string = text_block.as_string()
 
-            with open(path.join(ADDON_DIR, file_name), 'r') as f:
+            file_path = os_path.join(ADDON_DIR, file_name)
+            with open(file_path, 'r') as f:
                 file_string = f.read()
 
             if file_string == as_string:
@@ -318,7 +330,7 @@ class TextBlockMonitor(PersistantHandler):
             if file_name not in bpy.data.texts:
                 text_block = bpy.data.texts.new(file_name)
 
-                file_path = path.join(ADDON_DIR, file_name)
+                file_path = os_path.join(ADDON_DIR, file_name)
                 with open(file_path, 'r') as f:
                     text_block.from_string(f.read())
 
