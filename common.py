@@ -1,4 +1,4 @@
-from collections import namedtuple
+from collections import namedtuple, OrderedDict
 from json import JSONEncoder, JSONDecoder, dumps, loads
 from mathutils import Vector
 
@@ -18,9 +18,9 @@ class VectorEncoder(JSONEncoder):
 class VectorDecoder(JSONDecoder):
 
     def __init__(self, *args, **kwargs):
-        super().__init__(object_hook=self.object_hook, *args, **kwargs)
+        super().__init__(object_hook=self._object_hook, *args, **kwargs)
 
-    def object_hook(self, obj):
+    def _object_hook(self, obj):
         if 'vector' in obj:
             vect = obj['vector']
             values = list(vect.items())
@@ -71,7 +71,7 @@ def parse_component_arg_name(name):
 
 
 def group_component_args(properties):
-    components = {}
+    components = OrderedDict()
 
     for name, value in properties.items():
         try:
@@ -82,7 +82,7 @@ def group_component_args(properties):
         try:
             component_data = components[data.import_path]
         except KeyError:
-            component_data = components[data.import_path] = {}
+            component_data = components[data.import_path] = OrderedDict()
 
         component_data[data.arg_name] = value
 

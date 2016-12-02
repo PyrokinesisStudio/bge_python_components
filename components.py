@@ -1,4 +1,5 @@
 import bge
+from collections import OrderedDict
 
 
 class ThirdPerson(bge.types.KX_PythonComponent):
@@ -11,10 +12,10 @@ class ThirdPerson(bge.types.KX_PythonComponent):
 
     """
 
-    args = {
-        "Move Speed": 10,
-        "Turn Speed": 0.04,
-    }
+    args = OrderedDict((
+        ("Turn Speed", 0.04),
+        ("Move Speed", 10),
+    ))
 
     def start(self, args):
         self.move_speed = args['Move Speed']
